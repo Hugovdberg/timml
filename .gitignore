@@ -1,0 +1,7 @@
+docs/*.aux
+docs/*.bbl
+docs/*.blg
+docs/*.log
+docs/*.toc
+docs/*.synctex
+docs/*-converted-to.pdf
