@@ -1,7 +1,7 @@
 """
 ml.py contains the Model class
 This file is part of the TimML library and is distributed under
-the GNU LPGL. See the TimML.py file for more details.
+the GNU LGPL. See the TimML.py file for more details.
 (c) Mark Bakker, 2002-2007
 """
 
