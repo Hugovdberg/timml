@@ -99,4 +99,9 @@ ENV/
 
 # f2py
 .plist
-.vscode/settings.json
+
+# Visual Studio Code settings
+.vscode/
+
+# MyPy type checking
+.mypy_cache/
