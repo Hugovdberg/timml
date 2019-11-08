@@ -1,9 +1,40 @@
-import numpy as np
+"""Aquifer description"""
 import inspect  # Used for storing the input
+
+import numpy as np
+
 from .aquifer_parameters import param_maq
 from .constant import ConstantStar
 
+
 class AquiferData:
+    """
+    AquiferData Base class for aquifer descriptions.
+
+    Parameters
+    ----------
+        model : Model
+            Model to which the aquifer description should be added
+        kaq : float, numpy.array
+            Hydraulic conductivity of each aquifer from the top down
+        z : float, numpy.array
+            Elevation of the tops and bottoms of all layers. Layers
+            may have zero thickness
+        c : float, numpy.array
+            Resistance between two consecutive aquifer layers
+            if ltype[0]='a': length is number of aquifers - 1
+            if ltype[0]='l': length is number of aquifers
+        npor : float, numpy.array
+            Porosity of each layer, from the top down
+        ltype : str, List[str]
+            Character array describing which layers are aquifers (a) or
+            leaky layers (l).
+
+    Returns
+    -------
+    None
+    """
+
     def __init__(self, model, kaq, c, z, npor, ltype):
         # All input variables except model should be numpy arrays
         # That should be checked outside this function
@@ -20,34 +51,36 @@ class AquiferData:
         self.npor = np.atleast_1d(npor)
         self.ltype = np.atleast_1d(ltype)
         # tag indicating whether an aquifer is Laplace (confined on top)
-        if self.ltype[0] == 'a':
+        if self.ltype[0] == "a":
             self.ilap = 1
         else:
             self.ilap = 0
         #
         self.area = 1e200  # Smaller than default of ml.aq so that inhom is found
-        self.layernumber = np.zeros(self.nlayers, dtype='int')
-        self.layernumber[self.ltype == 'a'] = np.arange(self.naq)
-        self.layernumber[self.ltype == 'l'] = np.arange(self.nlayers - self.naq)
-        if self.ltype[0] == 'a':
-            self.layernumber[self.ltype == 'l'] += 1  # first leaky layer below first aquifer layer
-        self.zaqtop = self.z[:-1][self.ltype == 'a']
-        self.zaqbot = self.z[1:][self.ltype == 'a']
+        self.layernumber = np.zeros(self.nlayers, dtype="int")
+        self.layernumber[self.ltype == "a"] = np.arange(self.naq)
+        self.layernumber[self.ltype == "l"] = np.arange(self.nlayers - self.naq)
+        if self.ltype[0] == "a":
+            self.layernumber[
+                self.ltype == "l"
+            ] += 1  # first leaky layer below first aquifer layer
+        self.zaqtop = self.z[:-1][self.ltype == "a"]
+        self.zaqbot = self.z[1:][self.ltype == "a"]
         self.Haq = self.zaqtop - self.zaqbot
         self.T = self.kaq * self.Haq
         self.Tcol = self.T[:, np.newaxis]
-        self.zlltop = self.z[:-1][self.ltype == 'l']
-        self.zllbot = self.z[1:][self.ltype == 'l']
-        if self.ltype[0] == 'a':
+        self.zlltop = self.z[:-1][self.ltype == "l"]
+        self.zllbot = self.z[1:][self.ltype == "l"]
+        if self.ltype[0] == "a":
             self.zlltop = np.hstack((self.z[0], self.zlltop))
             self.zllbot = np.hstack((self.z[0], self.zllbot))
         self.Hll = self.zlltop - self.zllbot
-        self.nporaq = self.npor[self.ltype == 'a']
-        if self.ltype[0] == 'a':
-            self.nporll =  np.ones(len(self.npor[self.ltype == 'l']) + 1)
-            self.nporll[1:] = self.npor[self.ltype == 'l']
+        self.nporaq = self.npor[self.ltype == "a"]
+        if self.ltype[0] == "a":
+            self.nporll = np.ones(len(self.npor[self.ltype == "l"]) + 1)
+            self.nporll[1:] = self.npor[self.ltype == "l"]
         else:
-            self.nporll = self.npor[self.ltype == 'l']
+            self.nporll = self.npor[self.ltype == "l"]
 
     def initialize(self):
         self.elementlist = []  # Elementlist of aquifer
@@ -64,7 +97,9 @@ class AquiferData:
         if self.ilap:
             self.lab = np.zeros(self.naq)
             self.lab[1:] = 1.0 / np.sqrt(w[1:])
-            self.zeropluslab = self.lab  # to be deprecated when new lambda is fully implemented
+            self.zeropluslab = (
+                self.lab
+            )  # to be deprecated when new lambda is fully implemented
             v[:, 0] = self.T / np.sum(self.T)  # first column is normalized T
         else:
             self.lab = 1.0 / np.sqrt(w)
@@ -77,36 +112,36 @@ class AquiferData:
             self.hstar = e.hstar
 
     def isinside(self, x, y):
-        raise Exception('Must overload AquiferData.isinside()')
+        raise Exception("Must overload AquiferData.isinside()")
 
     def storeinput(self, frame):
         self.inputargs, _, _, self.inputvalues = inspect.getargvalues(frame)
-        
+
     def findlayer(self, z):
-        '''
-        Returns layer-number, layer-type and model-layer-number'''
+        """
+        Returns layer-number, layer-type and model-layer-number"""
         if z > self.z[0]:
-            modellayer, ltype = -1, 'above'
+            modellayer, ltype = -1, "above"
             layernumber = None
         elif z < self.z[-1]:
-            modellayer, ltype = len(self.layernumber), 'below'
+            modellayer, ltype = len(self.layernumber), "below"
             layernumber = None
         else:
             modellayer = np.argwhere((z <= self.z[:-1]) & (z >= self.z[1:]))[0, 0]
             layernumber = self.layernumber[modellayer]
-            ltype = self.ltype[modellayer] 
+            ltype = self.ltype[modellayer]
         return layernumber, ltype, modellayer
 
 
 class Aquifer(AquiferData):
     def __init__(self, model, kaq, c, z, npor, ltype):
-        AquiferData.__init__(self, model, kaq, c, z, npor, ltype)
+        super().__init__(model, kaq, c, z, npor, ltype)
         self.inhomlist = []
         self.area = 1e300  # Needed to find smallest inhom
 
     def initialize(self):
         # cause we are going to call initialize for inhoms
-        AquiferData.initialize(self)
+        super().initialize()
         for inhom in self.inhomlist:
             inhom.initialize()
         for inhom in self.inhomlist:
@@ -123,14 +158,3 @@ class Aquifer(AquiferData):
                 if inhom.area < rv.area:
                     rv = inhom
         return rv
-        # Not used anymore I think 5 Nov 2015
-        # def find_aquifer_number(self, x, y):
-        #    rv = -1
-        #    for i,inhom in enumerate(self.inhomlist):
-        #        if inhom.isinside(x, y):
-        #            if inhom.area < rv.area:
-        #                rv = i
-        #    return rv
-
-
-        
