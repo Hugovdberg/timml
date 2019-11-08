@@ -1,14 +1,48 @@
-import numpy as np
+"""Circular area sink"""
 import inspect  # Used for storing the input
-from .element import Element
-from scipy.special import k0, k1, i0, i1
 
-__all__ = ['CircAreaSink']
+import numpy as np
+from scipy.special import i0, i1, k0, k1  # pylint: disable=no-name-in-module
+
+from .element import Element
+
+__all__ = ["CircAreaSink"]
+
 
 class CircAreaSink(Element):
-    def __init__(self, model, xc=0, yc=0, R=1, N=0.001, layer=0, name='CircAreasink', label=None):
-        Element.__init__(self, model, nparam=1, nunknowns=0, layers=layer, \
-                         name=name, label=label)
+    def __init__(
+        self, model, xc=0, yc=0, R=1, N=0.001, layer=0, name="CircAreasink", label=None
+    ):
+        """
+        CircAreaSink Circular area sink
+
+        A circular area sink is defined by a center location and radius,
+        with a constant recharge N in a given layer.
+
+        Parameters
+        ----------
+        Element : Element
+            [description]
+        model : Model
+            Model to which the CircAreaSink should be added
+        xc : float, optional
+            X-coordinate of the center location [L], by default 0
+        yc : float, optional
+            Y-coordinate of the center location [L], by default 0
+        R : float, optional
+            Radius of the circle [L], by default 1
+        N : float, optional
+            Recharge rate [L/T], by default 0.001
+        layer : int, optional
+            Layer in which the recharge should be added, by default 0
+        name : str, optional
+            Name of the element type, by default "CircAreasink"
+        label : str, optional
+            Label of the element, by default None
+        """
+        super().__init__(
+            model, nparam=1, nunknowns=0, layers=layer, name=name, label=label
+        )
         self.xc = xc
         self.yc = yc
         self.R = R
@@ -16,14 +50,16 @@ class CircAreaSink(Element):
         self.model.add_element(self)
 
     def __repr__(self):
-        return self.name + ' at ' + str((self.xc, self.yc))
+        return "{name} at {loc}".format(name=self.name, loc=(self.xc, self.yc))
 
     def initialize(self):
         self.Rsq = self.R ** 2
         self.aq = self.model.aq.find_aquifer_data(self.xc, self.yc)
         self.aq.add_element(self)
         self.parameters = np.array([[self.N]])
-        self.Rlarge = 500.0  # If R/lab > Rlarge, then we use asymptotic approximation to compute potential
+        self.Rlarge = (
+            500.0
+        )  # If R/lab > Rlarge, then we use asymptotic approximation to compute potential
         if self.aq.ilap:
             self.lab = self.aq.lab[1:]
             self.A = -self.aq.coef[self.layers, 1:] * self.R * self.lab
@@ -41,7 +77,8 @@ class CircAreaSink(Element):
         self.i1Roverlab = i1(self.R / self.labsmall)
 
     def potinf(self, x, y, aq=None):
-        if aq is None: aq = self.model.aq.find_aquifer_data(x, y)
+        if aq is None:
+            aq = self.model.aq.find_aquifer_data(x, y)
         rv = np.zeros((self.nparam, aq.naq))
         if aq == self.aq:
             r = np.sqrt((x - self.xc) ** 2 + (y - self.yc) ** 2)
@@ -60,7 +97,8 @@ class CircAreaSink(Element):
         return rv
 
     def disvecinf(self, x, y, aq=None):
-        if aq is None: aq = self.model.aq.find_aquifer_data(x, y)
+        if aq is None:
+            aq = self.model.aq.find_aquifer_data(x, y)
         rv = np.zeros((2, self.nparam, aq.naq))
         if aq == self.aq:
             r = np.sqrt((x - self.xc) ** 2 + (y - self.yc) ** 2)
@@ -90,7 +128,7 @@ class CircAreaSink(Element):
         else:
             r = np.sqrt((x - self.xc) ** 2 + (y - self.yc) ** 2)
             if r <= self.R:
-                raise 'CircAreaSink should add constant inside inhomogeneity'
+                raise "CircAreaSink should add constant inside inhomogeneity"
         return rv
 
     def K1RI0r(self, rin):
@@ -100,9 +138,12 @@ class CircAreaSink(Element):
             if index.any():
                 r = rin / self.labbig[index]
                 R = self.R / self.labbig[index]
-                rv[self.islarge * index] = np.sqrt(1 / (4 * r * R)) * np.exp(r - R) * \
-                                   (1 + 3 / (8 * R) - 15 / (128 * R ** 2) + 315 / (3072 * R ** 3)) * \
-                                   (1 + 1 / (8 * r) +  9 / (128 * r ** 2) + 225 / (3072 * r ** 3))
+                rv[self.islarge * index] = (
+                    np.sqrt(1 / (4 * r * R))
+                    * np.exp(r - R)
+                    * (1 + 3 / (8 * R) - 15 / (128 * R ** 2) + 315 / (3072 * R ** 3))
+                    * (1 + 1 / (8 * r) + 9 / (128 * r ** 2) + 225 / (3072 * r ** 3))
+                )
         if ~self.islarge.any():
             index = (self.R - rin) / self.labsmall < 10
             if index.any():
@@ -117,9 +158,12 @@ class CircAreaSink(Element):
             if index.any():
                 r = rin / self.labbig[index]
                 R = self.R / self.labbig[index]
-                rv[self.islarge * index] = np.sqrt(1 / (4 * r * R)) * np.exp(r - R) * \
-                                   (1 + 3 / (8 * R) - 15 / (128 * R ** 2) + 315 / (3072 * R ** 3)) * \
-                                   (1 - 3 / (8 * r) - 15 / (128 * r ** 2) - 315 / (3072 * r ** 3))
+                rv[self.islarge * index] = (
+                    np.sqrt(1 / (4 * r * R))
+                    * np.exp(r - R)
+                    * (1 + 3 / (8 * R) - 15 / (128 * R ** 2) + 315 / (3072 * R ** 3))
+                    * (1 - 3 / (8 * r) - 15 / (128 * r ** 2) - 315 / (3072 * r ** 3))
+                )
         if ~self.islarge.any():
             index = (self.R - rin) / self.labsmall < 10
             if index.any():
@@ -134,9 +178,12 @@ class CircAreaSink(Element):
             if index.any():
                 r = rin / self.labbig[index]
                 R = self.R / self.labbig[index]
-                rv[self.islarge * index] = np.sqrt(1 / (4 * r * R)) * np.exp(R - r) * \
-                                   (1 - 3 / (8 * R) - 15 / (128 * R ** 2) - 315 / (3072 * R ** 3)) * \
-                                   (1 - 1 / (8 * r) +  9 / (128 * r ** 2) - 225 / (3072 * r ** 3))
+                rv[self.islarge * index] = (
+                    np.sqrt(1 / (4 * r * R))
+                    * np.exp(R - r)
+                    * (1 - 3 / (8 * R) - 15 / (128 * R ** 2) - 315 / (3072 * R ** 3))
+                    * (1 - 1 / (8 * r) + 9 / (128 * r ** 2) - 225 / (3072 * r ** 3))
+                )
         if ~self.islarge.any():
             index = (self.R - rin) / self.labsmall < 10
             if index.any():
@@ -151,9 +198,12 @@ class CircAreaSink(Element):
             if index.any():
                 r = rin / self.labbig[index]
                 R = self.R / self.labbig[index]
-                rv[self.islarge * index] = np.sqrt(1 / (4 * r * R)) * np.exp(R - r) * \
-                                   (1 - 3 / (8 * R) - 15 / (128 * R ** 2) - 315 / (3072 * R ** 3)) * \
-                                   (1 + 3 / (8 * r) - 15 / (128 * r ** 2) + 315 / (3072 * r ** 3))
+                rv[self.islarge * index] = (
+                    np.sqrt(1 / (4 * r * R))
+                    * np.exp(R - r)
+                    * (1 - 3 / (8 * R) - 15 / (128 * R ** 2) - 315 / (3072 * R ** 3))
+                    * (1 + 3 / (8 * r) - 15 / (128 * r ** 2) + 315 / (3072 * r ** 3))
+                )
         if ~self.islarge.any():
             index = (self.R - rin) / self.labsmall < 10
             if index.any():
@@ -164,32 +214,77 @@ class CircAreaSink(Element):
     def qztop(self, x, y):
         rv = 0.0
         if np.sqrt((x - self.xc) ** 2 + (y - self.yc) ** 2) <= self.R:
-            rv = -self.parameters[0, 0]  # minus cause the parameter is the infiltration rate
+            rv = -self.parameters[
+                0, 0
+            ]  # minus cause the parameter is the infiltration rate
         return rv
 
-    def changetrace(self, xyzt1, xyzt2, aq, layer, ltype, modellayer, direction, hstepmax):
+    def _segment_crosses_border(self, xy1, xy2):
+        dist_center_1 = np.linalg.norm(xy1[:2] - [self.xc, self.yc])
+        dist_center_2 = np.linalg.norm(xy2[:2] - [self.xc, self.yc])
+        dist_min, dist_max = sorted([dist_center_1, dist_center_2])
+        return dist_min < self.R and dist_max > self.R
+
+    def changetrace(
+        self, xyzt1, xyzt2, aq, layer, ltype, modellayer, direction, hstepmax
+    ):
+        """
+        changetrace Optionally change the path of a trace
+
+        If a line segment xyzt1-xyzt2 is affected by the current element
+        return the changed direction, and possibly terminate the tracing.
+
+        Parameters
+        ----------
+        xyzt1 : np.array
+            Starting point of the trace segment
+        xyzt2 : np.array
+            End point of the trace segment
+        aq : AquiferData
+            TODO: Verify type and purpose of the argument
+        layer : int
+            Layer index in which the traced segment is located
+        ltype : str
+            Layer type in which the traced segment is located
+        modellayer : Any
+            TODO: Verify type and purpose of the argument
+        direction : int
+            Indicator whether the trace is run forwards or backwards
+        hstepmax : float
+            Maximum horizontal step size.
+
+        Returns
+        -------
+        tuple(bool, bool, np.array, str)
+            Tuple containing information on whether the trace was
+            changed, whether tracing should terminate, what the new
+            segment end point is, and a description why the trace
+            terminated.
+        """
         changed = False
         terminate = False
         xyztnew = 0
         message = None
         eps = 1e-8
-        r1sq = (xyzt1[0] - self.xc) ** 2 + (xyzt1[1] - self.yc) ** 2
-        r2sq = (xyzt2[0] - self.xc) ** 2 + (xyzt2[1] - self.yc) ** 2
-        if (r1sq < self.Rsq and r2sq > self.Rsq ) or (r1sq > self.Rsq and r2sq < self.Rsq):
+        if self._segment_crosses_border(xyzt1, xyzt2):
             changed = True
             x1, y1 = xyzt1[0:2]
             x2, y2 = xyzt2[0:2]
             a = (x2 - x1) ** 2 + (y2 - y1) ** 2
             b = 2 * ((x2 - x1) * (x1 - self.xc) + (y2 - y1) * (y1 - self.yc))
-            c = self.xc ** 2 + self.yc ** 2 + x1 ** 2 + y1 ** 2 - 2 * (self.xc * x1 +self.yc * y1) - self.Rsq
+            c = (
+                self.xc ** 2
+                + self.yc ** 2
+                + x1 ** 2
+                + y1 ** 2
+                - 2 * (self.xc * x1 + self.yc * y1)
+                - self.Rsq
+            )
             u1 = (-b - np.sqrt(b ** 2 - 4 * a * c)) / (2 * a)
             u2 = (-b + np.sqrt(b ** 2 - 4 * a * c)) / (2 * a)
             if u1 > 0:
-                u = u1 * (1.0 + eps) # Go just beyond circle
+                u = u1 * (1.0 + eps)  # Go just beyond circle
             else:
-                u = u2 * (1.0 + eps) # Go just beyond circle
-            xn = x1 + u * (x2 - x1)
-            yn = y1 + u * (y2 - y1)
-            zn = xyzt1[2] + u * (xyzt2[2] - xyzt1[2])
+                u = u2 * (1.0 + eps)  # Go just beyond circle
             xyztnew = xyzt1 + u * (xyzt2 - xyzt1)
-        return changed, terminate, xyztnew, message
+        return changed, terminate, [xyztnew], message
